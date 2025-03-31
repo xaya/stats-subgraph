@@ -1,0 +1,27 @@
+specVersion: 1.1.0
+schema:
+  file: schema.graphql
+dataSources:
+  - kind: ethereum/contract
+    name: XayaAccounts
+    network: matic
+    source:
+      address: "0x8C12253F71091b9582908C8a44F78870Ec6F304F"
+      abi: IXayaAccounts
+      startBlock: 28432385
+    mapping:
+      kind: ethereum/events
+      apiVersion: 0.0.7
+      language: wasm/assemblyscript
+      entities:
+        - Address
+        - Name
+        - Namespace
+        - Registration
+      abis:
+        - name: IXayaAccounts
+          file: ./abi/IXayaAccounts.json
+      eventHandlers:
+        - event: Registration(string,string,indexed uint256,address)
+          handler: handleRegistration
+      file: src/handlers.ts

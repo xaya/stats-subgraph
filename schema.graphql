@@ -1,0 +1,44 @@
+# A namespace that has been seen on the blockchain.
+type Namespace @entity (immutable: true) {
+  # The ID is the namespace string as Bytes.
+  id: Bytes!
+  # The namespace as string.
+  ns: String!
+
+  names: [Name!]! @derivedFrom (field: "ns")
+}
+
+# A Xaya name (of any namespace) that has been seen on the blockchain.
+type Name @entity {
+  # The ID is the token ID encoded as Bytes.
+  id: Bytes!
+
+  # The namespace this name belongs to.
+  ns: Namespace!
+  # The account name as string.
+  name: String!
+
+  # Address currently holding the name.
+  owner: Address!
+
+  registration: Registration! @derivedFrom (field: "name")
+}
+
+# A single Registration event detected.
+type Registration @entity (immutable: true) {
+  # The ID is generated from txhash and log index and is just a unique value.
+  id: Bytes!
+  timestamp: BigInt!
+
+  # The name that was registered.
+  name: Name!
+}
+
+# An address that holds or did hold names.
+type Address @entity (immutable: true) {
+  # The ID is the address itself as bytes.
+  id: Bytes!
+
+  # All names held at the moment by the address.
+  names: [Name!]! @derivedFrom (field: "owner")
+}
