@@ -20,7 +20,7 @@ import {
  * Converts a token ID given as BigInt to Bytes that can be used
  * as ID in the subgraph.
  */
-function tokenIdToBytes (id: BigInt): Bytes
+export function tokenIdToBytes (id: BigInt): Bytes
 {
   /* See https://github.com/protofire/subgraph-toolkit/blob/main/lib/utils.ts
      as an example.  */
