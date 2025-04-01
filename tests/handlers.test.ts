@@ -16,6 +16,7 @@ import {
 
 import {
   Registration as RegistrationEvent,
+  Transfer as TransferEvent,
 } from "../generated/XayaAccounts/IXayaAccounts"
 
 import {
@@ -27,6 +28,7 @@ import {
 
 import {
   handleRegistration,
+  handleTransfer,
   tokenIdToBytes,
 } from "../src/handlers"
 
@@ -89,6 +91,26 @@ function testRegistration (ns: String, name: String, owner: Address): void
       new ethereum.EventParam ("owner", ethereum.Value.fromAddress (owner)))
 
   handleRegistration (ev)
+}
+
+/**
+ * Helper function to create and process a Transfer event.
+ */
+function testTransfer (ns: String, name: String,
+                       from: Address, to: Address): void
+{
+  const tokenId = computeTokenId (ns, name)
+
+  const ev = changetype<TransferEvent> (mockEvent ())
+  ev.parameters.push (
+      new ethereum.EventParam ("from", ethereum.Value.fromAddress (from)))
+  ev.parameters.push (
+      new ethereum.EventParam ("to", ethereum.Value.fromAddress (to)))
+  ev.parameters.push (
+      new ethereum.EventParam ("tokenId",
+                               ethereum.Value.fromUnsignedBigInt (tokenId)))
+
+  handleTransfer (ev)
 }
 
 /* ************************************************************************** */
@@ -162,7 +184,28 @@ describe ("Registration", () => {
 
     testRegistration ("g", "domob", BOB)
     assertName ("p", "domob", ALICE)
-    assertName ("g", "domob", ALICE)
+    assertName ("g", "domob", BOB)
+  })
+
+})
+
+describe ("Transfer", () => {
+
+  test ("creates Address correctly", () => {
+    testRegistration ("p", "domob", ALICE)
+    testTransfer ("p", "domob", ALICE, BOB)
+    assertAddress (BOB)
+  })
+
+  test ("updates name ownership", () => {
+    testRegistration ("p", "domob", ALICE)
+    testRegistration ("p", "andy", ALICE)
+    assertName ("p", "domob", ALICE)
+    assertName ("p", "andy", ALICE)
+
+    testTransfer ("p", "domob", ALICE, BOB)
+    assertName ("p", "domob", BOB)
+    assertName ("p", "andy", ALICE)
   })
 
 })

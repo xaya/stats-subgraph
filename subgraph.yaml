@@ -24,4 +24,6 @@ dataSources:
       eventHandlers:
         - event: Registration(string,string,indexed uint256,address)
           handler: handleRegistration
+        - event: Transfer(indexed address,indexed address,indexed uint256)
+          handler: handleTransfer
       file: src/handlers.ts

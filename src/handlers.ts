@@ -1,5 +1,6 @@
 import {
   Registration as RegistrationEvent,
+  Transfer as TransferEvent,
 } from "../generated/XayaAccounts/IXayaAccounts"
 
 import {
@@ -12,6 +13,7 @@ import {
 import {
   Address,
   BigInt,
+  ByteArray,
   Bytes,
   ethereum,
 } from "@graphprotocol/graph-ts"
@@ -22,9 +24,7 @@ import {
  */
 export function tokenIdToBytes (id: BigInt): Bytes
 {
-  /* See https://github.com/protofire/subgraph-toolkit/blob/main/lib/utils.ts
-     as an example.  */
-  return (id as Uint8Array) as Bytes
+  return Bytes.fromByteArray (ByteArray.fromBigInt (id))
 }
 
 /**
@@ -67,4 +67,22 @@ export function handleRegistration (ev: RegistrationEvent): void
   regEntity.timestamp = ev.block.timestamp
   regEntity.name = tokenId
   regEntity.save ()
+}
+
+export function handleTransfer (ev: TransferEvent): void
+{
+  maybeCreateAddress (ev.params.to)
+
+  const tokenId = tokenIdToBytes (ev.params.tokenId)
+  const nameEntity = NameEntity.load (tokenId)
+
+  /* When a name is registered, it is minted first (which Transfer's from
+     the zero address), and later the Registration event is emitted.  In this
+     case the name does not exist.  Ignore that, as the registration handler
+     will set the owner.  */
+  if (nameEntity == null)
+    return
+
+  nameEntity.owner = ev.params.to
+  nameEntity.save ()
 }
