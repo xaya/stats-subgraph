@@ -1,12 +1,15 @@
 import {
+  Move as MoveEvent,
   Registration as RegistrationEvent,
   Transfer as TransferEvent,
 } from "../generated/XayaAccounts/IXayaAccounts"
 
 import {
   Address as AddressEntity,
+  Move as MoveEntity,
   Name as NameEntity,
   Namespace as NamespaceEntity,
+  Payment as PaymentEntity,
   Registration as RegistrationEntity,
 } from "../generated/schema"
 
@@ -42,6 +45,26 @@ function maybeCreateAddress (addr: Address): void
 {
   if (AddressEntity.load (addr) == null)
     new AddressEntity (addr).save ()
+}
+
+export function handleMove (ev: MoveEvent): void
+{
+  const nsId = Bytes.fromUTF8 (ev.params.ns)
+  const tokenId = tokenIdToBytes (ev.params.tokenId)
+
+  const mvEntity = new MoveEntity (uniqueIdForEvent (ev))
+  mvEntity.timestamp = ev.block.timestamp
+  mvEntity.name = tokenId
+  mvEntity.save ()
+
+  if (ev.params.receiver != Address.zero ())
+    {
+      const payment = new PaymentEntity (uniqueIdForEvent (ev))
+      payment.move = mvEntity.id
+      payment.receiver = ev.params.receiver
+      payment.amount = ev.params.amount
+      payment.save ()
+    }
 }
 
 export function handleRegistration (ev: RegistrationEvent): void

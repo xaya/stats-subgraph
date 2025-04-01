@@ -22,6 +22,7 @@ type Name @entity {
   owner: Address!
 
   registration: Registration! @derivedFrom (field: "name")
+  moves: [Move!]! @derivedFrom (field: "name")
 }
 
 # A single Registration event detected.
@@ -32,6 +33,34 @@ type Registration @entity (immutable: true) {
 
   # The name that was registered.
   name: Name!
+}
+
+# A single Move that was done, independent of the data stored.
+type Move @entity (immutable: true) {
+  # The ID is generated from txhash and log index and is just a unique value.
+  id: Bytes!
+  timestamp: BigInt!
+
+  # The name that sent the move.
+  name: Name!
+
+  # Optionally a payment associated to this move.
+  payment: Payment @derivedFrom (field: "move")
+}
+
+# A single WCHI payment attached to a move.
+type Payment @entity (immutable: true) {
+  # The ID is generated from txhash and log index and is just a unique value.
+  id: Bytes!
+
+  # The move that sent this payment.
+  move: Move!
+
+  # The receiver address as bytes.
+  receiver: Bytes!
+
+  # Amount in WCHI sats.
+  amount: BigInt!
 }
 
 # An address that holds or did hold names.

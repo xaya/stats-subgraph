@@ -15,13 +15,17 @@ dataSources:
       language: wasm/assemblyscript
       entities:
         - Address
+        - Move
         - Name
         - Namespace
+        - Payment
         - Registration
       abis:
         - name: IXayaAccounts
           file: ./abi/IXayaAccounts.json
       eventHandlers:
+        - event: Move(string,string,string,indexed uint256,uint256,address,uint256,address)
+          handler: handleMove
         - event: Registration(string,string,indexed uint256,address)
           handler: handleRegistration
         - event: Transfer(indexed address,indexed address,indexed uint256)
