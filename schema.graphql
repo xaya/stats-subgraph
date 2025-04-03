@@ -1,3 +1,12 @@
+# An address that holds or did hold names.
+type Address @entity (immutable: true) {
+  # The ID is the address itself as bytes.
+  id: Bytes!
+
+  # All names held at the moment by the address.
+  names: [Name!]! @derivedFrom (field: "owner")
+}
+
 # A namespace that has been seen on the blockchain.
 type Namespace @entity (immutable: true) {
   # The ID is the namespace string as Bytes.
@@ -6,6 +15,16 @@ type Namespace @entity (immutable: true) {
   ns: String!
 
   names: [Name!]! @derivedFrom (field: "ns")
+}
+
+# A game ID that has been seen on the blockchain.
+type Game @entity (immutable: true) {
+  # The ID is the game ID as Bytes.
+  id: Bytes!
+  # The game ID as string.
+  game: String!
+
+  moves: [GameMove!]! @derivedFrom (field: "game")
 }
 
 # A Xaya name (of any namespace) that has been seen on the blockchain.
@@ -46,6 +65,9 @@ type Move @entity (immutable: true) {
 
   # Optionally a payment associated to this move.
   payment: Payment @derivedFrom (field: "move")
+
+  # Game moves sent with this.
+  games: [GameMove!]! @derivedFrom (field: "move")
 }
 
 # A single WCHI payment attached to a move.
@@ -63,11 +85,16 @@ type Payment @entity (immutable: true) {
   amount: BigInt!
 }
 
-# An address that holds or did hold names.
-type Address @entity (immutable: true) {
-  # The ID is the address itself as bytes.
+# A move for a particular game (i.e. p/ name, and contains that key
+# inside the "g" key in its JSON).
+type GameMove @entity (immutable: true) {
+  # The ID is generated from txhash, log index and game ID and is just a
+  # unique value.
   id: Bytes!
 
-  # All names held at the moment by the address.
-  names: [Name!]! @derivedFrom (field: "owner")
+  # The overall move that contains this game move.
+  move: Move!
+
+  # The Game instance this is for.
+  game: Game!
 }

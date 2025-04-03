@@ -22,6 +22,7 @@ import {
 
 import {
   Address as AddressEntity,
+  Game as GameEntity,
   Name as NameEntity,
   Namespace as NamespaceEntity,
   Registration as RegistrationEntity,
@@ -175,6 +176,15 @@ function assertNamespace (ns: String): void
 }
 
 /**
+ * Helper function that checks that a given Game entity exists.
+ */
+function assertGame (game: String): void
+{
+  const id = Bytes.fromUTF8 (game)
+  assert.fieldEquals ("Game", id.toHexString (), "game", game)
+}
+
+/**
  * Helper function to assert that a Name entry exists and has the given owner.
  * This also checks that it has an associated Registration entry that
  * is consistent.
@@ -318,6 +328,46 @@ describe ("Moves", () => {
     assertNumMoves ("p", "domob", 4)
     assertMovePayment ("p", "domob", 42, BOB)
     assertMovePayment ("p", "domob", 50, ALICE)
+  })
+
+  test ("handles Games in moves", () => {
+    testRegistration ("p", "domob", ALICE)
+    testRegistration ("p", "andy", BOB)
+
+    testMove ("p", "domob", "{\"g\": {\"tn\": invalid}}")
+    testMove ("p", "domob", "{\"g\": {\"tn\": 42}} extra")
+    testMove ("p", "andy", "{\"g\": {\"xs\": 0, \"sv\": {}}}")
+
+    assertGame ("sv")
+    assertGame ("xs")
+    assert.notInStore ("Game", Bytes.fromUTF8 ("tn").toHexString ())
+
+    assertNumMoves ("p", "domob", 2)
+    let nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    let nameEntity = NameEntity.load (nameId)!
+    const movesDomob = nameEntity.moves.load ()
+    for (let i = 0; i < movesDomob.length; ++i)
+      assert.i32Equals (movesDomob[i].games.load ().length, 0)
+
+    assertNumMoves ("p", "andy", 1)
+    nameId = tokenIdToBytes (computeTokenId ("p", "andy"))
+    nameEntity = NameEntity.load (nameId)!
+    const moveAndy = nameEntity.moves.load ()[0]
+    const games = moveAndy.games.load ()
+    assert.i32Equals (games.length, 2)
+    let foundXS = false
+    let foundSV = false
+    for (let i = 0; i < games.length; ++i)
+      {
+        assert.bytesEquals (games[i].move, moveAndy.id)
+        const gameStr = GameEntity.load (games[i].game)!.game
+        if (gameStr == "xs")
+          foundXS = true
+        else if (gameStr == "sv")
+          foundSV = true
+      }
+    assert.assertTrue (foundXS)
+    assert.assertTrue (foundSV)
   })
 
 })

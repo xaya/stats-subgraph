@@ -6,6 +6,8 @@ import {
 
 import {
   Address as AddressEntity,
+  Game as GameEntity,
+  GameMove as GameMoveEntity,
   Move as MoveEntity,
   Name as NameEntity,
   Namespace as NamespaceEntity,
@@ -18,7 +20,9 @@ import {
   BigInt,
   ByteArray,
   Bytes,
+  JSONValueKind,
   ethereum,
+  json,
 } from "@graphprotocol/graph-ts"
 
 /**
@@ -47,23 +51,84 @@ function maybeCreateAddress (addr: Address): void
     new AddressEntity (addr).save ()
 }
 
+/**
+ * Creates a Game entity if it doesn't exist already.  Returns the Game instance
+ * ID used.
+ */
+function maybeCreateGame (gid: string): Bytes
+{
+  const id = Bytes.fromUTF8 (gid)
+
+  if (GameEntity.load (id) == null)
+    {
+      const entity = new GameEntity (id)
+      entity.game = gid
+      entity.save ()
+    }
+
+  return id
+}
+
+/**
+ * Tries to parse a move value for a p/ name, and returns all game IDs
+ * that it contains (if any).  Returns [] in case of parsing errors or
+ * anything else that is invalid.
+ */
+function getPlayerMoveGames (mv: string): Array<string>
+{
+  const parsed = json.try_fromString (mv)
+  if (parsed.isError)
+    return []
+  const val = parsed.value
+  if (val.kind != JSONValueKind.OBJECT)
+    return []
+  let obj = val.toObject ()
+
+  const valOrNull = obj.get ("g")
+  if (valOrNull == null || valOrNull.kind != JSONValueKind.OBJECT)
+    return []
+  obj = valOrNull.toObject ()
+
+  const res = new Array<string> (obj.entries.length)
+  for (let i = 0; i < obj.entries.length; ++i)
+    res[i] = obj.entries[i].key
+
+  return res
+}
+
 export function handleMove (ev: MoveEvent): void
 {
   const nsId = Bytes.fromUTF8 (ev.params.ns)
   const tokenId = tokenIdToBytes (ev.params.tokenId)
+  const uniqueId = uniqueIdForEvent (ev)
 
-  const mvEntity = new MoveEntity (uniqueIdForEvent (ev))
+  const mvEntity = new MoveEntity (uniqueId)
   mvEntity.timestamp = ev.block.timestamp
   mvEntity.name = tokenId
   mvEntity.save ()
 
   if (ev.params.receiver != Address.zero ())
     {
-      const payment = new PaymentEntity (uniqueIdForEvent (ev))
+      const payment = new PaymentEntity (uniqueId)
       payment.move = mvEntity.id
       payment.receiver = ev.params.receiver
       payment.amount = ev.params.amount
       payment.save ()
+    }
+
+  if (ev.params.ns == "p")
+    {
+      const games = getPlayerMoveGames (ev.params.mv)
+      for (let i = 0; i < games.length; ++i)
+        {
+          const gid = maybeCreateGame (games[i]);
+
+          const gmvId = uniqueId.concat (gid)
+          const gmvEntity = new GameMoveEntity (gmvId)
+          gmvEntity.move = mvEntity.id
+          gmvEntity.game = gid
+          gmvEntity.save ()
+        }
     }
 }
 
