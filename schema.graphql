@@ -28,7 +28,7 @@ type Game @entity (immutable: true) {
 }
 
 # A Xaya name (of any namespace) that has been seen on the blockchain.
-type Name @entity {
+type Name @entity (immutable: false) {
   # The ID is the token ID encoded as Bytes.
   id: Bytes!
 
@@ -60,8 +60,14 @@ type Move @entity (immutable: true) {
   id: Bytes!
   timestamp: BigInt!
 
+  # The transaction ID that sent that move.
+  txid: Bytes!
+
   # The name that sent the move.
   name: Name!
+
+  # The move data.
+  move: String!
 
   # Optionally a payment associated to this move.
   payment: Payment @derivedFrom (field: "move")

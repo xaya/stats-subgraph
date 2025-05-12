@@ -104,7 +104,9 @@ export function handleMove (ev: MoveEvent): void
 
   const mvEntity = new MoveEntity (uniqueId)
   mvEntity.timestamp = ev.block.timestamp
+  mvEntity.txid = ev.transaction.hash
   mvEntity.name = tokenId
+  mvEntity.move = ev.params.mv
   mvEntity.save ()
 
   if (ev.params.receiver != Address.zero ())
