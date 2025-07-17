@@ -109,8 +109,6 @@ type GameMove @entity (immutable: true) {
   # unique value.
   id: Bytes!
 
-  # TODO: Add the game-specific part of the move here.
-
   # The overall move that contains this game move.
   move: Move!
 
@@ -121,4 +119,7 @@ type GameMove @entity (immutable: true) {
 
   # The Game instance this is for.
   game: Game!
+
+  # The game-specific part of the move JSON.
+  gamemove: String!
 }

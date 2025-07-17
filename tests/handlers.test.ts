@@ -401,9 +401,15 @@ describe ("Moves", () => {
         assert.bytesEquals (games[i].move, moveAndy.id)
         const gameStr = GameEntity.load (games[i].game)!.game
         if (gameStr == "xs")
-          foundXS = true
+          {
+            foundXS = true
+            assert.stringEquals (games[i].gamemove, "0")
+          }
         else if (gameStr == "sv")
-          foundSV = true
+          {
+            foundSV = true
+            assert.stringEquals (games[i].gamemove, "{}")
+          }
       }
     assert.assertTrue (foundXS)
     assert.assertTrue (foundSV)

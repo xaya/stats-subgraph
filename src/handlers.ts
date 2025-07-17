@@ -26,6 +26,10 @@ import {
   json,
 } from "@graphprotocol/graph-ts"
 
+import {
+  serialiseJson,
+} from "./serialise"
+
 /**
  * Converts a token ID given as BigInt to Bytes that can be used
  * as ID in the subgraph.
@@ -88,27 +92,29 @@ function maybeCreateGame (gid: string): Bytes
 
 /**
  * Tries to parse a move value for a p/ name, and returns all game IDs
- * that it contains (if any).  Returns [] in case of parsing errors or
+ * that it contains (if any), mapping to the game-specific part
+ * of the move data JSON.  Returns an empty map in case of parsing errors or
  * anything else that is invalid.
  */
-function getPlayerMoveGames (mv: string): Array<string>
+function getPlayerMoveGames (mv: string): Map<string, string>
 {
+  const res = new Map<string, string> ()
+
   const parsed = json.try_fromString (mv)
   if (parsed.isError)
-    return []
+    return res
   const val = parsed.value
   if (val.kind != JSONValueKind.OBJECT)
-    return []
+    return res
   let obj = val.toObject ()
 
   const valOrNull = obj.get ("g")
   if (valOrNull == null || valOrNull.kind != JSONValueKind.OBJECT)
-    return []
+    return res
   obj = valOrNull.toObject ()
 
-  const res = new Array<string> (obj.entries.length)
   for (let i = 0; i < obj.entries.length; ++i)
-    res[i] = obj.entries[i].key
+    res.set (obj.entries[i].key, serialiseJson (obj.entries[i].value))
 
   return res
 }
@@ -137,15 +143,17 @@ export function handleMove (ev: MoveEvent): void
   if (ev.params.ns == "p")
     {
       const games = getPlayerMoveGames (ev.params.mv)
-      for (let i = 0; i < games.length; ++i)
+      for (let i = 0; i < games.keys ().length; ++i)
         {
-          const gid = maybeCreateGame (games[i]);
+          const game = games.keys ()[i]
+          const gid = maybeCreateGame (game);
 
           const gmvId = uniqueId.concat (gid)
           const gmvEntity = new GameMoveEntity (gmvId)
           gmvEntity.move = mvEntity.id
           gmvEntity.tx = mvEntity.tx
           gmvEntity.game = gid
+          gmvEntity.gamemove = games.get (game)
           gmvEntity.save ()
         }
     }
