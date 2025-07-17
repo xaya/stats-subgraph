@@ -13,6 +13,7 @@ import {
   Namespace as NamespaceEntity,
   Payment as PaymentEntity,
   Registration as RegistrationEntity,
+  Transaction as TransactionEntity,
 } from "../generated/schema"
 
 import {
@@ -40,6 +41,22 @@ export function tokenIdToBytes (id: BigInt): Bytes
 function uniqueIdForEvent (ev: ethereum.Event): Bytes
 {
   return ev.transaction.hash.concatI32 (ev.logIndex.toI32 ())
+}
+
+/**
+ * Creates a Transaction entity if it doesn't exist already.
+ */
+function maybeCreateTransaction (ev: ethereum.Event): Bytes
+{
+  const id = ev.transaction.hash
+  if (TransactionEntity.load (id) == null)
+    {
+      const entity = new TransactionEntity (id)
+      entity.height = ev.block.number
+      entity.timestamp = ev.block.timestamp
+      entity.save ()
+    }
+  return id
 }
 
 /**
@@ -103,8 +120,7 @@ export function handleMove (ev: MoveEvent): void
   const uniqueId = uniqueIdForEvent (ev)
 
   const mvEntity = new MoveEntity (uniqueId)
-  mvEntity.timestamp = ev.block.timestamp
-  mvEntity.txid = ev.transaction.hash
+  mvEntity.tx = maybeCreateTransaction (ev)
   mvEntity.name = tokenId
   mvEntity.move = ev.params.mv
   mvEntity.save ()
@@ -128,6 +144,7 @@ export function handleMove (ev: MoveEvent): void
           const gmvId = uniqueId.concat (gid)
           const gmvEntity = new GameMoveEntity (gmvId)
           gmvEntity.move = mvEntity.id
+          gmvEntity.tx = mvEntity.tx
           gmvEntity.game = gid
           gmvEntity.save ()
         }
@@ -154,7 +171,7 @@ export function handleRegistration (ev: RegistrationEvent): void
   nameEntity.save ()
 
   const regEntity = new RegistrationEntity (uniqueIdForEvent (ev))
-  regEntity.timestamp = ev.block.timestamp
+  regEntity.tx = maybeCreateTransaction (ev)
   regEntity.name = tokenId
   regEntity.save ()
 }

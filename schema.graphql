@@ -7,6 +7,16 @@ type Address @entity (immutable: true) {
   names: [Name!]! @derivedFrom (field: "owner")
 }
 
+# A transaction in the underlying blockchain.
+type Transaction @entity (immutable: true) {
+  # The ID is the transaction ID as bytes.
+  id: Bytes!
+
+  # Block height and timestamp of the transaction.
+  height: BigInt!
+  timestamp: BigInt!
+}
+
 # A namespace that has been seen on the blockchain.
 type Namespace @entity (immutable: true) {
   # The ID is the namespace string as Bytes.
@@ -48,7 +58,9 @@ type Name @entity (immutable: false) {
 type Registration @entity (immutable: true) {
   # The ID is generated from txhash and log index and is just a unique value.
   id: Bytes!
-  timestamp: BigInt!
+
+  # The transaction that did the registration.
+  tx: Transaction!
 
   # The name that was registered.
   name: Name!
@@ -58,10 +70,9 @@ type Registration @entity (immutable: true) {
 type Move @entity (immutable: true) {
   # The ID is generated from txhash and log index and is just a unique value.
   id: Bytes!
-  timestamp: BigInt!
 
-  # The transaction ID that sent that move.
-  txid: Bytes!
+  # The transaction that did the move.
+  tx: Transaction!
 
   # The name that sent the move.
   name: Name!
@@ -98,8 +109,15 @@ type GameMove @entity (immutable: true) {
   # unique value.
   id: Bytes!
 
+  # TODO: Add the game-specific part of the move here.
+
   # The overall move that contains this game move.
   move: Move!
+
+  # We replicate the transaction reference here from move, so that
+  # we can sort by transaction timestamp.  GraphQL on The Graph supports
+  # sorting by nested fields only one level deep.
+  tx: Transaction!
 
   # The Game instance this is for.
   game: Game!

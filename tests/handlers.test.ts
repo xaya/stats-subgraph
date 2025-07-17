@@ -26,6 +26,7 @@ import {
   Name as NameEntity,
   Namespace as NamespaceEntity,
   Registration as RegistrationEntity,
+  Transaction as TransactionEntity,
 } from "../generated/schema"
 
 import {
@@ -40,6 +41,9 @@ import {
 /* Some addresses to use in tests.  */
 const ALICE = Address.fromString ("0x4807cd9e01ca43f6d8b5bc70c59ff64a3433b778")
 const BOB = Address.fromString ("0x78ecbc2f0d748be27570a6c33e06458a10cebf8d")
+
+/* Transaction id we use in tests.  */
+const TXID = Bytes.fromI32 (200)
 
 /* Internal counter to produce unique logIndex values.  */
 let nextLogIndex: i32 = 0
@@ -64,8 +68,9 @@ function mockEvent (): ethereum.Event
 {
   const ev = newMockEvent ()
 
+  ev.block.number = BigInt.fromI32 (1000)
   ev.block.timestamp = BigInt.fromI32 (100)
-  ev.transaction.hash = Bytes.fromI32 (200)
+  ev.transaction.hash = TXID
   ev.logIndex = BigInt.fromI32 (nextLogIndex++)
 
   ev.parameters = new Array ()
@@ -167,6 +172,17 @@ function assertAddress (addr: Address): void
 }
 
 /**
+ * Helper function to assert that a Transaction exists in the database.
+ */
+function assertTransaction (txHash: Bytes): void
+{
+  const txEntity = TransactionEntity.load (txHash)
+  assert.assertNotNull (txEntity)
+  assert.fieldEquals ("Transaction", txHash.toHexString (), "height", "1000")
+  assert.fieldEquals ("Transaction", txHash.toHexString (), "timestamp", "100")
+}
+
+/**
  * Helper function that checks that a given Namespace entity exists.
  */
 function assertNamespace (ns: String): void
@@ -255,6 +271,17 @@ describe ("Registration", () => {
     assert.notInStore ("Address", BOB.toHexString ())
   })
 
+  test ("creates Transaction reference correctly", () => {
+    testRegistration ("p", "domob", ALICE)
+
+    assertTransaction (TXID)
+
+    const nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    const registrations = NameEntity.load (nameId)!.registration.load ()
+    assert.i32Equals (registrations.length, 1)
+    assert.bytesEquals (registrations[0].tx, TXID)
+  })
+
   test ("creates Namespace correctly", () => {
     testRegistration ("p", "domob", ALICE)
     assertNamespace ("p")
@@ -316,6 +343,18 @@ describe ("Moves", () => {
     testMove ("p", "domob", "{}")
     assertNumMoves ("p", "domob", 2)
     assertNumMoves ("p", "andy", 1)
+  })
+
+  test ("creates Transaction reference correctly", () => {
+    testRegistration ("p", "domob", ALICE)
+    testMove ("p", "domob", "{}")
+
+    assertTransaction (TXID)
+
+    const nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    const moves = NameEntity.load (nameId)!.moves.load ()
+    assert.i32Equals (moves.length, 1)
+    assert.bytesEquals (moves[0].tx, TXID)
   })
 
   test ("creates Payments for moves", () => {
