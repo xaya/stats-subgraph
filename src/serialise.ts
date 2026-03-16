@@ -60,44 +60,51 @@ export function serialiseJson (value: JSONValue): string
 function escapeJsonString (str: string): string
 {
   let result = '"'
-  
+  let chunkStart = 0
+
   for (let i = 0; i < str.length; i++)
     {
       const charCode = str.charCodeAt (i)
-      
+
+      let escaped = ''
       switch (charCode)
         {
           case 34: // '"'
-            result += '\\"'
+            escaped = '\\"'
             break
           case 92: // '\\'
-            result += '\\\\'
+            escaped = '\\\\'
             break
           case 8: // '\b'
-            result += '\\b'
+            escaped = '\\b'
             break
           case 12: // '\f'
-            result += '\\f'
+            escaped = '\\f'
             break
           case 10: // '\n'
-            result += '\\n'
+            escaped = '\\n'
             break
           case 13: // '\r'
-            result += '\\r'
+            escaped = '\\r'
             break
           case 9: // '\t'
-            result += '\\t'
+            escaped = '\\t'
             break
           default:
-            /* Handle other control characters and literal characters.  */
+            /* Handle other control characters; regular characters are left
+               to be flushed as part of a chunk below.  */
             if (charCode < 32)
-              result += '\\u' + charCode.toString (16).padStart (4, '0')
-            else
-              result += str.charAt (i)
+              escaped = '\\u' + charCode.toString (16).padStart (4, '0')
             break
         }
+
+      if (escaped.length > 0)
+        {
+          result += str.slice (chunkStart, i) + escaped
+          chunkStart = i + 1
+        }
     }
-  
-  result += '"'
+
+  result += str.slice (chunkStart) + '"'
   return result
 }
