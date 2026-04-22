@@ -19,25 +19,25 @@ import {
 import {
   Address,
   BigInt,
-  ByteArray,
   Bytes,
+  JSONValue,
   JSONValueKind,
   ethereum,
   json,
 } from "@graphprotocol/graph-ts"
 
 import {
+  processMove as processMoveProfile,
+} from "./profile"
+
+import {
   serialiseJson,
 } from "./serialise"
 
-/**
- * Converts a token ID given as BigInt to Bytes that can be used
- * as ID in the subgraph.
- */
-export function tokenIdToBytes (id: BigInt): Bytes
-{
-  return Bytes.fromByteArray (ByteArray.fromBigInt (id))
-}
+import {
+  tokenIdForName,
+  tokenIdToBytes,
+} from "./util"
 
 /**
  * Constructs a unique ID for an event, based on txhash and log index.
@@ -96,17 +96,13 @@ function maybeCreateGame (gid: string): Bytes
  * of the move data JSON.  Returns an empty map in case of parsing errors or
  * anything else that is invalid.
  */
-function getPlayerMoveGames (mv: string): Map<string, string>
+function getPlayerMoveGames (value: JSONValue): Map<string, string>
 {
   const res = new Map<string, string> ()
 
-  const parsed = json.try_fromString (mv)
-  if (parsed.isError)
+  if (value.kind != JSONValueKind.OBJECT)
     return res
-  const val = parsed.value
-  if (val.kind != JSONValueKind.OBJECT)
-    return res
-  let obj = val.toObject ()
+  let obj = value.toObject ()
 
   const valOrNull = obj.get ("g")
   if (valOrNull == null || valOrNull.kind != JSONValueKind.OBJECT)
@@ -117,6 +113,40 @@ function getPlayerMoveGames (mv: string): Map<string, string>
     res.set (obj.entries[i].key, serialiseJson (obj.entries[i].value))
 
   return res
+}
+
+/**
+ * Tries to parse a name's move as JSON and process it (if successful)
+ * in various ways.
+ */
+function processMoveJson (mvEntity: MoveEntity, ns: string, name: string): void
+{
+  const parsed = json.try_fromString (mvEntity.move)
+  if (parsed.isError)
+    return
+
+  if (ns == "p")
+    {
+      const games = getPlayerMoveGames (parsed.value)
+      for (let i = 0; i < games.keys ().length; ++i)
+        {
+          const game = games.keys ()[i]
+          const gid = maybeCreateGame (game);
+
+          const gmvId = mvEntity.id.concat (gid)
+          const gmvEntity = new GameMoveEntity (gmvId)
+          gmvEntity.move = mvEntity.id
+          gmvEntity.tx = mvEntity.tx
+          gmvEntity.game = gid
+          gmvEntity.gamemove = games.get (game)
+          gmvEntity.save ()
+        }
+    }
+
+  if (ns == "p" || ns == "g")
+    {
+      processMoveProfile (ns, name, parsed.value)
+    }
 }
 
 export function handleMove (ev: MoveEvent): void
@@ -140,27 +170,15 @@ export function handleMove (ev: MoveEvent): void
       payment.save ()
     }
 
-  if (ev.params.ns == "p")
-    {
-      const games = getPlayerMoveGames (ev.params.mv)
-      for (let i = 0; i < games.keys ().length; ++i)
-        {
-          const game = games.keys ()[i]
-          const gid = maybeCreateGame (game);
-
-          const gmvId = uniqueId.concat (gid)
-          const gmvEntity = new GameMoveEntity (gmvId)
-          gmvEntity.move = mvEntity.id
-          gmvEntity.tx = mvEntity.tx
-          gmvEntity.game = gid
-          gmvEntity.gamemove = games.get (game)
-          gmvEntity.save ()
-        }
-    }
+  processMoveJson (mvEntity, ev.params.ns, ev.params.name)
 }
 
 export function handleRegistration (ev: RegistrationEvent): void
 {
+  /* Sanity check to ensure our implementation of the tokenId computation
+     is in sync with the smart contract.  */
+  assert (ev.params.tokenId == tokenIdForName (ev.params.ns, ev.params.name))
+
   maybeCreateAddress (ev.params.owner)
 
   const nsId = Bytes.fromUTF8 (ev.params.ns)
