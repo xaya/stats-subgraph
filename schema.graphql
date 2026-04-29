@@ -52,6 +52,7 @@ type Name @entity (immutable: false) {
 
   registration: Registration! @derivedFrom (field: "name")
   moves: [Move!]! @derivedFrom (field: "name")
+  profileData: [ProfileData!]! @derivedFrom (field: "account")
 }
 
 # A single Registration event detected.
@@ -122,4 +123,30 @@ type GameMove @entity (immutable: true) {
 
   # The game-specific part of the move JSON.
   gamemove: String!
+}
+
+################################################################################
+# Public profile data
+
+# A bit of data stored in an account's public profile.  Profile data is
+# a key/value storage, with string keys and values.  For each account, there
+# is a separate key/value store for data placed by the account itself and by
+# admin accounts (such as hiding profile pictures).  Both of them are stored
+# as entities of this type.
+type ProfileData @entity (immutable: false) {
+  # The ID is the concatenation of the account ID (token ID of the p/ name),
+  # a single byte 0/1 for admin false/true, and the key string as bytes.
+  id: Bytes!
+
+  # The account this corresponds to (which will always be a p/ name).
+  account: Name!
+
+  # Whether or not this is an admin entry.
+  admin: Boolean!
+
+  # The key as string.
+  key: String!
+
+  # The associated value.
+  value: String!
 }

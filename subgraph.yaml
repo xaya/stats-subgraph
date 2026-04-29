@@ -21,6 +21,7 @@ dataSources:
         - Name
         - Namespace
         - Payment
+        - ProfileData
         - Registration
         - Transaction
       abis:

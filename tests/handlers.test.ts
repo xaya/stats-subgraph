@@ -3,163 +3,36 @@ import {
   afterEach,
   clearStore,
   describe,
-  newMockEvent,
   test,
 } from "matchstick-as/assembly/index"
 
 import {
   Address,
-  BigInt,
   Bytes,
-  ethereum,
 } from "@graphprotocol/graph-ts"
-
-import {
-  Move as MoveEvent,
-  Registration as RegistrationEvent,
-  Transfer as TransferEvent,
-} from "../generated/XayaAccounts/IXayaAccounts"
 
 import {
   Address as AddressEntity,
   Game as GameEntity,
   Name as NameEntity,
   Namespace as NamespaceEntity,
-  Registration as RegistrationEntity,
   Transaction as TransactionEntity,
 } from "../generated/schema"
 
 import {
-  handleMove,
-  handleRegistration,
-  handleTransfer,
+  ALICE,
+  BOB,
+  TXID,
+  testMove,
+  testMoveWithPayment,
+  testRegistration,
+  testTransfer,
+} from "./testutils"
+
+import {
+  tokenIdForName,
   tokenIdToBytes,
-} from "../src/handlers"
-
-/* ************************************************************************** */
-
-/* Some addresses to use in tests.  */
-const ALICE = Address.fromString ("0x4807cd9e01ca43f6d8b5bc70c59ff64a3433b778")
-const BOB = Address.fromString ("0x78ecbc2f0d748be27570a6c33e06458a10cebf8d")
-
-/* Transaction id we use in tests.  */
-const TXID = Bytes.fromI32 (200)
-
-/* Internal counter to produce unique logIndex values.  */
-let nextLogIndex: i32 = 0
-
-/**
- * Helper function to compute a dummy "tokenId" from ns and name.
- */
-function computeTokenId (ns: String, name: String): BigInt
-{
-  const bytesId = Bytes.fromI32 (ns.length)
-      .concat (Bytes.fromUTF8 (ns))
-      .concat (Bytes.fromUTF8 (name))
-
-  return BigInt.fromUnsignedBytes (bytesId)
-}
-
-/**
- * Helper function to create a new mock event and also set some
- * dummy values (such as block / transaction / logIndex) on it.
- */
-function mockEvent (): ethereum.Event
-{
-  const ev = newMockEvent ()
-
-  ev.block.number = BigInt.fromI32 (1000)
-  ev.block.timestamp = BigInt.fromI32 (100)
-  ev.transaction.hash = TXID
-  ev.logIndex = BigInt.fromI32 (nextLogIndex++)
-
-  ev.parameters = new Array ()
-
-  return ev
-}
-
-/* ************************************************************************** */
-
-/**
- * Helper function to create and process a Move event with payment.
- */
-function testMoveWithPayment (ns: String, name: String, mv: String,
-                              amount: i32, receiver: Address): void
-{
-  const tokenId = computeTokenId (ns, name)
-
-  const ev = changetype<MoveEvent> (mockEvent ())
-  ev.parameters.push (
-      new ethereum.EventParam ("ns", ethereum.Value.fromString (ns)))
-  ev.parameters.push (
-      new ethereum.EventParam ("name", ethereum.Value.fromString (name)))
-  ev.parameters.push (
-      new ethereum.EventParam ("mv", ethereum.Value.fromString (mv)))
-  ev.parameters.push (
-      new ethereum.EventParam ("tokenId",
-                               ethereum.Value.fromUnsignedBigInt (tokenId)))
-  ev.parameters.push (
-      new ethereum.EventParam ("nonce", ethereum.Value.fromI32 (42)))
-  ev.parameters.push (
-      new ethereum.EventParam ("mover",
-                               ethereum.Value.fromAddress (Address.zero ())))
-  ev.parameters.push (
-      new ethereum.EventParam ("amount", ethereum.Value.fromI32 (amount)))
-  ev.parameters.push (
-      new ethereum.EventParam ("receiver",
-                               ethereum.Value.fromAddress (receiver)))
-
-  handleMove (ev)
-}
-
-/**
- * Helper function to create and process a Move event.
- */
-function testMove (ns: String, name: String, mv: String): void
-{
-  testMoveWithPayment (ns, name, mv, 0, Address.zero ())
-}
-
-/**
- * Helper function to create and process a Registration event.
- */
-function testRegistration (ns: String, name: String, owner: Address): void
-{
-  const tokenId = computeTokenId (ns, name)
-
-  const ev = changetype<RegistrationEvent> (mockEvent ())
-  ev.parameters.push (
-      new ethereum.EventParam ("ns", ethereum.Value.fromString (ns)))
-  ev.parameters.push (
-      new ethereum.EventParam ("name", ethereum.Value.fromString (name)))
-  ev.parameters.push (
-      new ethereum.EventParam ("tokenId",
-                               ethereum.Value.fromUnsignedBigInt (tokenId)))
-  ev.parameters.push (
-      new ethereum.EventParam ("owner", ethereum.Value.fromAddress (owner)))
-
-  handleRegistration (ev)
-}
-
-/**
- * Helper function to create and process a Transfer event.
- */
-function testTransfer (ns: String, name: String,
-                       from: Address, to: Address): void
-{
-  const tokenId = computeTokenId (ns, name)
-
-  const ev = changetype<TransferEvent> (mockEvent ())
-  ev.parameters.push (
-      new ethereum.EventParam ("from", ethereum.Value.fromAddress (from)))
-  ev.parameters.push (
-      new ethereum.EventParam ("to", ethereum.Value.fromAddress (to)))
-  ev.parameters.push (
-      new ethereum.EventParam ("tokenId",
-                               ethereum.Value.fromUnsignedBigInt (tokenId)))
-
-  handleTransfer (ev)
-}
+} from "../src/util"
 
 /* ************************************************************************** */
 
@@ -207,7 +80,7 @@ function assertGame (game: String): void
  */
 function assertName (ns: String, name: String, owner: Address): void
 {
-  const id = tokenIdToBytes (computeTokenId (ns, name))
+  const id = tokenIdToBytes (tokenIdForName (ns, name))
   const nameEntity = NameEntity.load (id)
   assert.assertNotNull (nameEntity)
 
@@ -226,7 +99,7 @@ function assertName (ns: String, name: String, owner: Address): void
  */
 function assertNumMoves (ns: String, name: String, num: i32): void
 {
-  const id = tokenIdToBytes (computeTokenId (ns, name))
+  const id = tokenIdToBytes (tokenIdForName (ns, name))
   const nameEntity = NameEntity.load (id)!
 
   assert.i32Equals (nameEntity.moves.load ().length, num)
@@ -239,7 +112,7 @@ function assertNumMoves (ns: String, name: String, num: i32): void
 function assertMovePayment (ns: String, name: String,
                             amount: i32, receiver: Address): void
 {
-  const id = tokenIdToBytes (computeTokenId (ns, name))
+  const id = tokenIdToBytes (tokenIdForName (ns, name))
   const nameEntity = NameEntity.load (id)!
 
   let found = false
@@ -276,7 +149,7 @@ describe ("Registration", () => {
 
     assertTransaction (TXID)
 
-    const nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    const nameId = tokenIdToBytes (tokenIdForName ("p", "domob"))
     const registrations = NameEntity.load (nameId)!.registration.load ()
     assert.i32Equals (registrations.length, 1)
     assert.bytesEquals (registrations[0].tx, TXID)
@@ -296,7 +169,7 @@ describe ("Registration", () => {
     testRegistration ("p", "domob", ALICE)
     assertName ("p", "domob", ALICE)
 
-    const id = tokenIdToBytes (computeTokenId ("g", "domob"))
+    const id = tokenIdToBytes (tokenIdForName ("g", "domob"))
     assert.notInStore ("Name", id.toHexString ())
 
     testRegistration ("g", "domob", BOB)
@@ -351,7 +224,7 @@ describe ("Moves", () => {
 
     assertTransaction (TXID)
 
-    const nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    const nameId = tokenIdToBytes (tokenIdForName ("p", "domob"))
     const moves = NameEntity.load (nameId)!.moves.load ()
     assert.i32Equals (moves.length, 1)
     assert.bytesEquals (moves[0].tx, TXID)
@@ -382,14 +255,14 @@ describe ("Moves", () => {
     assert.notInStore ("Game", Bytes.fromUTF8 ("tn").toHexString ())
 
     assertNumMoves ("p", "domob", 2)
-    let nameId = tokenIdToBytes (computeTokenId ("p", "domob"))
+    let nameId = tokenIdToBytes (tokenIdForName ("p", "domob"))
     let nameEntity = NameEntity.load (nameId)!
     const movesDomob = nameEntity.moves.load ()
     for (let i = 0; i < movesDomob.length; ++i)
       assert.i32Equals (movesDomob[i].games.load ().length, 0)
 
     assertNumMoves ("p", "andy", 1)
-    nameId = tokenIdToBytes (computeTokenId ("p", "andy"))
+    nameId = tokenIdToBytes (tokenIdForName ("p", "andy"))
     nameEntity = NameEntity.load (nameId)!
     const moveAndy = nameEntity.moves.load ()[0]
     const games = moveAndy.games.load ()
